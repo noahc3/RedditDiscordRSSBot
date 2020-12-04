@@ -92,8 +92,8 @@ The configuration file is stored next to the executable in `config.json`. A defa
       "EmbedImages": false,
       "UseDirectLink": true,
       "DiscordWebhooks": [
-        "https://discord.com/api/webhooks/784302205087121408/cXCQGYu6oPkUXchSnStDN3_7Tae6JsHYlcnNOWhrxBgLNWPm7SjBl1ANTXwJT0KNq1zJ",
-        "https://discord.com/api/webhooks/784333219687956480/EuHr3VQhBezhPP9A3T90OviHKruqpJaundiFI7x2UB8ij1hnSRJyXYSZROG5Z38jFSAm"
+        "https://discord.com/api/webhooks/123/abcd",
+        "https://discord.com/api/webhooks/456/efgh"
       ],
       "LastReadTime": "2020-12-04 2:32:20 AM"
     }
