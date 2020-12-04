@@ -19,6 +19,8 @@ Note that Reddit RSS feeds only show 25 posts at a time, and there is no page fu
 
 See [https://www.reddit.com/wiki/rss](https://www.reddit.com/wiki/rss) for information on making Reddit RSS URLs. Any Reddit RSS URL is supported.
 
+When you are trying to sort posts, it is important to include `?sort=[sort]` at the end of the URL (ex. `https://www.reddit.com/r/pics/new.rss?sort=new`) as otherwise the sort will occasionally not apply correctly.
+
 ## Creating Regular Expression Filters
 
 To match any post, simply set the filter to `.*`.
