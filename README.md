@@ -1,4 +1,4 @@
-# Reddit RSS Bot
+# Reddit Discord RSS Bot
 
 Bot that reads Reddit RSS feeds and sends new posts to Discord webhook(s).
 
