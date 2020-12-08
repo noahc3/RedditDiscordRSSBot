@@ -56,6 +56,7 @@ The configuration file is stored next to the executable in `config.json`. A defa
     "DisplayTitles": [true/false],
     "EmbedImages": [true/false],
     "UseDirectLink": [true/false],
+    "IncludeCommentsLink": [true/false],
     "DiscordWebhooks": [...],
     "LastReadTime": [DateTime parseable date+time string]
 }
@@ -65,9 +66,22 @@ The configuration file is stored next to the executable in `config.json`. A defa
 - **RegexWhitelist**: The RegEx pattern to test for matches. Posts will only be sent to the webhook if the title matches this string. Use `.*` to match anything.
 - **DisplayTitles**: When true, the original post title is displayed in the embed. When false, `[Link]` is displayed instead of the post title.
 - **EmbedImages**: When true, if the post is detected as linking to an image, the bot will parse the image URL and embed it. No effect on posts that do not directly link to an image.
-- **UseDirectLink**: When false, the link in the embed will be for the Reddit post comments page. When true, the target link of the post will be parsed and used as the embed link. No effect on text posts.
-- **DiscordWebhooks**: A string array of Discord webhook URLs to send new post embeds to.
+- **UseDirectLink**: When false, the primary link in the embed will be for the Reddit post comments page. When true, the target link of the post will be parsed and used as the primary embed link. No effect on text posts.
+- **IncludeCommentsLink**: When true, an additional direct link to the post comments will be included. Useful if you want to also link to comments when direct links are enabled for the primary embed URL.
+- **DiscordWebhooks**: An object array of Discord webhooks (see below).
 - **LastReadTime**: A datetime string parseable by .NET DateTime.Parse(). This is automatically updated by the bot when new posts are read, and only posts newer than this timestamp will be detected as new on the subsequent scan. Only edit this manually for debugging purposes.
+
+### Webhook Configuration
+
+{
+    Endpoint: [url],
+    RolePingIds: [...],
+    UserPingIds: [...]
+}
+
+- **Endpoint**: The URL of the webhook endpoint.
+- **RolePingIds**: A string array of role ID's to ping with each message sent to this specific webhook.
+- **UserPingIds**: A string array of user ID's to ping with each message sent to this specific webhook.
 
 ### Example Configuration
 
@@ -82,8 +96,11 @@ The configuration file is stored next to the executable in `config.json`. A defa
       "DisplayTitles": false,
       "EmbedImages": true,
       "UseDirectLink": false,
+      "IncludeCommentsLink": false,
       "DiscordWebhooks": [
-        "https://discord.com/api/webhooks/123/abcd"
+        {
+          "Endpoint": "https://discord.com/api/webhooks/123/abcd"
+        }
       ],
       "LastReadTime": "2020-12-04 2:30:41 AM"
     },
@@ -93,9 +110,21 @@ The configuration file is stored next to the executable in `config.json`. A defa
       "DisplayTitles": true,
       "EmbedImages": false,
       "UseDirectLink": true,
+      "IncludeCommentsLink": true,
       "DiscordWebhooks": [
-        "https://discord.com/api/webhooks/123/abcd",
-        "https://discord.com/api/webhooks/456/efgh"
+        {
+          "Endpoint": "https://discord.com/api/webhooks/123/abcd",
+          "PingUserIds": [
+            "1234567890",
+            "0987654321"
+          ],
+          "PingRoleIds": [
+            "890678456123"
+          ]
+        },
+        {
+          "Endpoint": "https://discord.com/api/webhooks/456/efgh"
+        }
       ],
       "LastReadTime": "2020-12-04 2:32:20 AM"
     }
@@ -110,13 +139,17 @@ The first feed will:
 - check for new posts with any title,
 - not include the title of the post in the embed,
 - embed the image if the post directly links to an image, 
-- link to the comments page of the post, and
-- send new post embeds to one webhook.
+- have the primary post link to the comments page,
+- will not include a dedicated comments link beyond the primary URL, and
+- send new post embeds to one webhook without any user or role pings.
 
 The second feed will:
 - scan /r/bapcsalescanada sorted by new,
 - check for new posts with "gpu", "graphic", "video", or "3080" in the title, with `(?i)` marking the RegEx pattern as case insensitive,
 - include the full post title in the embed,
 - not embed any linked images,
-- link to the target link provided by the post, or the comments page if not a link post, and
-- send new post embeds to two webhooks.
+- link to the target link provided by the post, or the comments page if not a link post,
+- have a dedicated link to the comments page, and
+- send new post embeds to two webhooks:
+  - the messages to the first webhook will ping two users and one role
+  - the messages to the second webhook will not ping any users or roles

@@ -32,6 +32,16 @@ namespace RedditDiscordRSSBot {
 
             foreach(RssFeed feed in config.Feeds) {
                 feed.LastReadTimeDT = DateTime.Parse(feed.LastReadTime);
+                foreach(DiscordWebhook hook in feed.DiscordWebhooks) {
+                    hook.PingString = "";
+                    foreach(string id in hook.PingRoleIds) {
+                        hook.PingString += $"<@&{id}> ";
+                    }
+
+                    foreach (string id in hook.PingUserIds) {
+                        hook.PingString += $"<@{id}> ";
+                    }
+                }
             }
         }
 
@@ -77,6 +87,7 @@ namespace RedditDiscordRSSBot {
                             Author = k.Author,
                             PublishDate = dt,
                             Url = feed.UseDirectLink ? directLink : k.Link,
+                            CommentsUrl = feed.IncludeCommentsLink ? k.Link : null,
                             HasImage = hasImage,
                             ImageUrl = hasImage ? directLink : ""
                         };
@@ -98,7 +109,7 @@ namespace RedditDiscordRSSBot {
         private static Embed BuildDiscordEmbed(Post post) {
             var embed = new EmbedBuilder {
                 Title = post.Title,
-                Description = $"Posted in /r/{post.Subreddit} by {post.Author}",
+                Description = $"Posted in /r/{post.Subreddit} by {post.Author}" + (post.CommentsUrl != null ? $"\n[see comments]({post.CommentsUrl})" : ""),
                 Timestamp = post.PublishDate,
                 Url = post.Url
             };
@@ -124,9 +135,9 @@ namespace RedditDiscordRSSBot {
                     }
                 }
 
-                foreach (string webhook in feed.DiscordWebhooks) {
-                    using (var client = new DiscordWebhookClient(webhook)) {
-                        client.SendMessageAsync(embeds: embeds).Wait();
+                foreach (DiscordWebhook webhook in feed.DiscordWebhooks) {
+                    using (var client = new DiscordWebhookClient(webhook.Endpoint)) {
+                        client.SendMessageAsync(text: webhook.PingString.Length > 0 ? webhook.PingString : null, embeds: embeds).Wait();
                     }
                 }
             }

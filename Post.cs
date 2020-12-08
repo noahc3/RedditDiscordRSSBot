@@ -10,6 +10,7 @@ namespace RedditDiscordRSSBot {
         public string Author;
         public DateTime? PublishDate;
         public string Url;
+        public string CommentsUrl;
         public bool HasImage;
         public string ImageUrl;
 
