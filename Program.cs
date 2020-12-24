@@ -130,9 +130,12 @@ namespace RedditDiscordRSSBot {
             } else if (feed.TrackType == 1) { //track by storing read post id's from the last n hours
                 foreach (FeedItem k in feed.LatestFeed.Items) {
                     if (!readPosts.ContainsKey(k.Id)) {
-                        MarkPostRead(k.Id, DateTime.Parse(k.GetElement("updated")));
-                        if (Regex.IsMatch(k.Title, feed.RegexWhitelist)) {
-                            newPosts.Add(CreatePost(feed, k));
+                        DateTime date = DateTime.Parse(k.GetElement("updated"));
+                        if (date.AddHours(config.ReadPostRetentionTimeHours) > DateTime.Now) { //ignore posts older than the retention time, like announcements.
+                            MarkPostRead(k.Id, DateTime.Parse(k.GetElement("updated")));
+                            if (Regex.IsMatch(k.Title, feed.RegexWhitelist)) {
+                                newPosts.Add(CreatePost(feed, k));
+                            }
                         }
                     }
                 }
@@ -173,6 +176,8 @@ namespace RedditDiscordRSSBot {
                 HasImage = hasImage,
                 ImageUrl = hasImage ? directLink : ""
             };
+
+            if (post.Url.StartsWith("/")) post.Url = "https://www.reddit.com" + post.Url;
             post.Embed = BuildDiscordEmbed(post);
 
             return post;
