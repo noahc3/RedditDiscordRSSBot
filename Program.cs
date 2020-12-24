@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,11 @@ namespace RedditDiscordRSSBot {
     class Program {
         private static Config config;
         private static Timer timer;
+        private static Dictionary<string, bool> readPosts = new Dictionary<string, bool>();
+        private static List<Tuple<double, List<string>>> timeClasses = new List<Tuple<double, List<string>>>();
+        private static Comparer<Tuple<double, List<string>>> timeClassComparer = Comparer<Tuple<double, List<string>>>.Create((x, y) => x.Item1.CompareTo(y.Item1));
+        private static DateTime LastReadPurge = DateTime.Parse("2000-1-01T00:00:00+00:00");
+
         static async Task Main(string[] args) {
             Console.WriteLine("Reddit RSS Bot by noahc3\n");
             LoadConfig();
@@ -30,11 +36,12 @@ namespace RedditDiscordRSSBot {
 
             config = Config.Deserialize(File.ReadAllText("config.json"));
 
-            foreach(RssFeed feed in config.Feeds) {
+            foreach (RssFeed feed in config.Feeds) {
                 feed.LastReadTimeDT = DateTime.Parse(feed.LastReadTime);
-                foreach(DiscordWebhook hook in feed.DiscordWebhooks) {
+                if (feed.TrackType == 1) config.AnyReadPostStorage = true;
+                foreach (DiscordWebhook hook in feed.DiscordWebhooks) {
                     hook.PingString = "";
-                    foreach(string id in hook.PingRoleIds) {
+                    foreach (string id in hook.PingRoleIds) {
                         hook.PingString += $"<@&{id}> ";
                     }
 
@@ -43,23 +50,61 @@ namespace RedditDiscordRSSBot {
                     }
                 }
             }
+
+            if (config.AnyReadPostStorage && File.Exists("read.blob")) {
+                string readBlob = File.ReadAllText("read.blob");
+                string[] split;
+                double ticks;
+                int index;
+                foreach(string k in readBlob.Split('\n')) {
+                    if (k.Contains(':')) {
+                        split = k.Split(':');
+                        ticks = double.Parse(split[0]);
+                        split = split[1].Split(',');
+                        index = ~timeClasses.BinarySearch(new Tuple<double, List<string>>(ticks, null), timeClassComparer);
+                        timeClasses.Insert(index, new Tuple<double, List<string>>(ticks, new List<string>()));
+                        foreach (string j in split) {
+                            timeClasses[index].Item2.Add(j);
+                            readPosts[j] = true;
+                        }
+                    }
+                }
+            }
         }
 
         private static void SaveConfig() {
             File.WriteAllText("config.json", config.Serialize());
+
+            if (config.AnyReadPostStorage) {
+                string readBlob = "";
+                string line;
+                foreach (Tuple<double, List<string>> k in timeClasses) {
+                    line = "";
+                    line += $"{k.Item1}:";
+                    foreach (string j in k.Item2) {
+                        line += $"{j},";
+                    }
+                    if (line.Last() == ',') line = line.Substring(0, line.Length - 1);
+                    line += '\n';
+                    readBlob += line;
+                }
+                File.WriteAllText("read.blob", readBlob);
+            }
         }
 
         private static void ParseFeeds() {
 
             if (config.OutputToConsole) Console.WriteLine($"\nParsing feeds at {DateTime.Now}");
 
-            foreach(RssFeed k in config.Feeds) {
+            foreach (RssFeed k in config.Feeds) {
                 k.LatestFeed = FeedReader.ReadAsync(k.FeedUrl).Result;
             }
 
-            foreach(RssFeed k in config.Feeds) {
+            foreach (RssFeed k in config.Feeds) {
                 ParseFeed(k);
             }
+
+            if (config.AnyReadPostStorage) PurgeReadPosts();
 
             SaveConfig();
 
@@ -71,39 +116,66 @@ namespace RedditDiscordRSSBot {
             DateTime newestReadTime = feed.LastReadTimeDT;
 
             if (config.OutputToConsole) Console.WriteLine($"\nParsing {feed.LatestFeed.Title} ({feed.FeedUrl})");
-            
-            foreach (FeedItem k in feed.LatestFeed.Items) {
-                if (Regex.IsMatch(k.Title, feed.RegexWhitelist)) {
-                    DateTime dt = DateTime.Parse(k.GetElement("updated"));
-                    if (dt > feed.LastReadTimeDT) {
-                        if (dt > newestReadTime) newestReadTime = dt;
 
-                        bool hasImage = feed.EmbedImages && k.HasElement("thumbnail");
-                        string directLink = (hasImage || feed.UseDirectLink) ? DirectLink(k) : "";
-
-                        Post post = new Post() {
-                            Title = feed.DisplayTitles ? k.Title : "[Link]",
-                            Subreddit = k.GetElementAttribute("category", "term"),
-                            Author = k.Author,
-                            PublishDate = dt,
-                            Url = feed.UseDirectLink ? directLink : k.Link,
-                            CommentsUrl = feed.IncludeCommentsLink ? k.Link : null,
-                            HasImage = hasImage,
-                            ImageUrl = hasImage ? directLink : ""
-                        };
-                        post.Embed = BuildDiscordEmbed(post);
-
-                        newPosts.Add(post);
+            if (feed.TrackType == 0) { //track by post time
+                foreach (FeedItem k in feed.LatestFeed.Items) {
+                    if (Regex.IsMatch(k.Title, feed.RegexWhitelist)) {
+                        DateTime dt = DateTime.Parse(k.GetElement("updated"));
+                        if (dt > feed.LastReadTimeDT) {
+                            if (dt > newestReadTime) newestReadTime = dt;
+                            newPosts.Add(CreatePost(feed, k));
+                        }
+                    }
+                }
+            } else if (feed.TrackType == 1) { //track by storing read post id's from the last n hours
+                foreach (FeedItem k in feed.LatestFeed.Items) {
+                    if (!readPosts.ContainsKey(k.Id)) {
+                        MarkPostRead(k.Id, DateTime.Parse(k.GetElement("updated")));
+                        if (Regex.IsMatch(k.Title, feed.RegexWhitelist)) {
+                            newPosts.Add(CreatePost(feed, k));
+                        }
                     }
                 }
             }
 
-            if (newPosts.Count > 0) {
+            if (newPosts.Count > 0) {   
                 feed.LastReadTimeDT = newestReadTime;
                 feed.LastReadTime = newestReadTime.ToString();
                 newPosts.Reverse();
                 NotifyNewPosts(feed, newPosts);
             }
+        }
+
+        private static void MarkPostRead(string id, DateTime time) {
+            double tickClass = Math.Floor(time.Ticks / 36000000000.0);
+
+            int index = timeClasses.BinarySearch(new Tuple<double, List<string>>(tickClass,null), timeClassComparer);
+            if (index < 0) {
+                index = ~index;
+                timeClasses.Insert(index, new Tuple<double, List<string>>(tickClass, new List<string>()));
+            }
+
+            timeClasses[index].Item2.Add(id);
+            readPosts[id] = true;
+        }
+
+        private static Post CreatePost(RssFeed feed, FeedItem k) {
+            bool hasImage = feed.EmbedImages && k.HasElement("thumbnail");
+            string directLink = (hasImage || feed.UseDirectLink) ? DirectLink(k) : "";
+
+            Post post = new Post() {
+                Title = feed.DisplayTitles ? k.Title : "[Link]",
+                Subreddit = k.GetElementAttribute("category", "term"),
+                Author = k.Author,
+                PublishDate = DateTime.Parse(k.GetElement("updated")),
+                Url = feed.UseDirectLink ? directLink : k.Link,
+                CommentsUrl = feed.IncludeCommentsLink ? k.Link : null,
+                HasImage = hasImage,
+                ImageUrl = hasImage ? directLink : ""
+            };
+            post.Embed = BuildDiscordEmbed(post);
+
+            return post;
         }
 
         private static Embed BuildDiscordEmbed(Post post) {
@@ -148,6 +220,23 @@ namespace RedditDiscordRSSBot {
             Match match = Regex.Match(item.Content, magic);
             if (match.Success) return match.Value;
             else return item.Link;
+        }
+
+
+        private static void PurgeReadPosts() {
+            if (DateTime.Now.Subtract(LastReadPurge).TotalHours >= 1) {
+                double purgeTimeClass = Math.Floor(DateTime.Now.AddHours(-1 * config.ReadPostRetentionTimeHours).Ticks / 36000000000.0);
+                Tuple<double, List<string>> timeClass = timeClasses[0];
+                while (timeClass != null && timeClass.Item1 <= purgeTimeClass) {
+                    foreach (string k in timeClass.Item2) {
+                        if (readPosts.ContainsKey(k)) readPosts.Remove(k);
+                    }
+                    timeClasses.Remove(timeClass);
+                    if (timeClasses.Count() > 0) timeClass = timeClasses[0];
+                    else timeClass = null;
+                }
+                LastReadPurge = DateTime.Now;
+            }
         }
     }
 }

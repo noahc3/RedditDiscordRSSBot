@@ -7,7 +7,12 @@ namespace RedditDiscordRSSBot {
     public class Config {
         public int IntervalSeconds = 60;
         public bool OutputToConsole = false;
+        public long ReadPostRetentionTimeHours = 168;
         public RssFeed[] Feeds = new RssFeed[0];
+        
+
+        [JsonIgnore]
+        public bool AnyReadPostStorage = false;
 
         
 

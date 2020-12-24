@@ -39,12 +39,14 @@ The configuration file is stored next to the executable in `config.json`. A defa
 {
     "IntervalSeconds": [0+],
     "OutputToConsole": [true/false],
+    "ReadPostRetentionTimeHours": [1+],
     "Feeds": [...]
 }
 ```
 
 - **IntervalSeconds**: The seconds paused between each scan of the RSS feed. Note this is time between the *starts* of two scans, not the end of one scan and start of the next.
 - **OutputToConsole**: Output parsing information to standard output, including when scans occur, which scans are currently in process, and information of newly detected posts. Useful for debugging.
+- **ReadPostRetentionTimeHours**: When using TrackType 2 for feeds, the number of hours to remember a post a "read". This number should be at least an hour longer than the maximum hours for a given filter (ex. for top 24 hrs sort, use 25 hrs here). No effect for feeds with TrackType 1.
 - **Feeds**: Array of Feed objects (see next section).
 
 ### Feed Configuration
@@ -53,6 +55,7 @@ The configuration file is stored next to the executable in `config.json`. A defa
 {
     "FeedUrl": [url],
     "RegexWhitelist": [regex string],
+    "TrackType": [0, 1],
     "DisplayTitles": [true/false],
     "EmbedImages": [true/false],
     "UseDirectLink": [true/false],
@@ -64,6 +67,7 @@ The configuration file is stored next to the executable in `config.json`. A defa
 
 - **FeedUrl**: The URL of the Reddit RSS feed to parse
 - **RegexWhitelist**: The RegEx pattern to test for matches. Posts will only be sent to the webhook if the title matches this string. Use `.*` to match anything.
+- **TrackType**: The method to track posts as read. 0 will track based on post time, and is ideal for feeds sorted by new. 1 will track the IDs of posts that have been read for the number of hours specified by ReadPostRetentionTimeHours, and is ideal for feeds sorted by hot or top.
 - **DisplayTitles**: When true, the original post title is displayed in the embed. When false, `[Link]` is displayed instead of the post title.
 - **EmbedImages**: When true, if the post is detected as linking to an image, the bot will parse the image URL and embed it. No effect on posts that do not directly link to an image.
 - **UseDirectLink**: When false, the primary link in the embed will be for the Reddit post comments page. When true, the target link of the post will be parsed and used as the primary embed link. No effect on text posts.
