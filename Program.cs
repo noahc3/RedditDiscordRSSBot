@@ -20,16 +20,30 @@ namespace RedditDiscordRSSBot {
         private static DateTime LastReadPurge = DateTime.Parse("2000-1-01T00:00:00+00:00");
 
         static async Task Main(string[] args) {
-            Console.WriteLine("Reddit RSS Bot by noahc3\n");
+            try {
+                Console.WriteLine("Reddit RSS Bot by noahc3\n");
 
-            AppDomain.CurrentDomain.ProcessExit += new EventHandler(CatchExit);
-            Console.CancelKeyPress += new ConsoleCancelEventHandler(CatchExit);
+                AppDomain.CurrentDomain.ProcessExit += new EventHandler(CatchExit);
+                Console.CancelKeyPress += new ConsoleCancelEventHandler(CatchExit);
 
-            LoadConfig();
+                LoadConfig();
 
-            timer = new Timer((e) => { ParseFeeds(); }, null, TimeSpan.Zero, TimeSpan.FromSeconds(config.IntervalSeconds));
+                timer = new Timer(
+                    (e) => { 
+                        try {
+                            ParseFeeds(); 
+                        } catch (Exception exc) {
+                            Debug.crash(exc);
+                        } 
+                    }, 
 
-            await Task.Delay(Timeout.Infinite, new CancellationTokenSource().Token).ConfigureAwait(false);
+                    null, TimeSpan.Zero, TimeSpan.FromSeconds(config.IntervalSeconds)
+                 );
+
+                await Task.Delay(Timeout.Infinite, new CancellationTokenSource().Token).ConfigureAwait(false);
+            } catch (Exception e) {
+                Debug.crash(e);
+            }
         }
 
         private static void LoadConfig() {
@@ -102,7 +116,6 @@ namespace RedditDiscordRSSBot {
         }
 
         private static void ParseFeeds() {
-
             if (config.OutputToConsole) Console.WriteLine($"\nParsing feeds at {DateTime.Now}");
 
             foreach (RssFeed k in config.Feeds) {

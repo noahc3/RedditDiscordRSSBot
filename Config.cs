@@ -5,6 +5,7 @@ using System.Text;
 
 namespace RedditDiscordRSSBot {
     public class Config {
+        public string PasteeeApiKey = "";
         public int IntervalSeconds = 60;
         public bool OutputToConsole = false;
         public long ReadPostRetentionTimeHours = 168;
