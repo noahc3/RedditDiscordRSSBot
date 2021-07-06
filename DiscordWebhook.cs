@@ -8,6 +8,7 @@ namespace RedditDiscordRSSBot {
         public string Endpoint = "";
         public string[] PingRoleIds = new string[0];
         public string[] PingUserIds = new string[0];
+        public bool SendDebuggingInfo = false;
 
         [JsonIgnore]
         public string PingString = "";

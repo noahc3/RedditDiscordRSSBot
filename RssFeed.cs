@@ -13,7 +13,7 @@ namespace RedditDiscordRSSBot {
         public bool EmbedImages = true;
         public bool UseDirectLink = true;
         public bool IncludeCommentsLink = true;
-        public DiscordWebhook[] DiscordWebhooks = new DiscordWebhook[0];
+        public string[] WebhookTargets = new string[0];
 
         public string LastReadTime = "2000-1-01T00:00:00+00:00";
 

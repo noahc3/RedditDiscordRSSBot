@@ -8,6 +8,7 @@ namespace RedditDiscordRSSBot {
         public int IntervalSeconds = 60;
         public bool OutputToConsole = false;
         public long ReadPostRetentionTimeHours = 168;
+        public Dictionary<string, DiscordWebhook> Webhooks = new Dictionary<string, DiscordWebhook>();
         public RssFeed[] Feeds = new RssFeed[0];
         
 

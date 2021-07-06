@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace RedditDiscordRSSBot {
     class Program {
-        private static Config config;
+        public static Config config;
         private static Timer timer;
         private static Dictionary<string, bool> readPosts = new Dictionary<string, bool>();
         private static List<Tuple<double, List<string>>> timeClasses = new List<Tuple<double, List<string>>>();
@@ -21,6 +21,10 @@ namespace RedditDiscordRSSBot {
 
         static async Task Main(string[] args) {
             Console.WriteLine("Reddit RSS Bot by noahc3\n");
+
+            AppDomain.CurrentDomain.ProcessExit += new EventHandler(CatchExit);
+            Console.CancelKeyPress += new ConsoleCancelEventHandler(CatchExit);
+
             LoadConfig();
 
             timer = new Timer((e) => { ParseFeeds(); }, null, TimeSpan.Zero, TimeSpan.FromSeconds(config.IntervalSeconds));
@@ -36,18 +40,21 @@ namespace RedditDiscordRSSBot {
 
             config = Config.Deserialize(File.ReadAllText("config.json"));
 
+            Debug.startup();
+
             foreach (RssFeed feed in config.Feeds) {
                 feed.LastReadTimeDT = DateTime.Parse(feed.LastReadTime);
                 if (feed.TrackType == 1) config.AnyReadPostStorage = true;
-                foreach (DiscordWebhook hook in feed.DiscordWebhooks) {
-                    hook.PingString = "";
-                    foreach (string id in hook.PingRoleIds) {
-                        hook.PingString += $"<@&{id}> ";
-                    }
+            }
 
-                    foreach (string id in hook.PingUserIds) {
-                        hook.PingString += $"<@{id}> ";
-                    }
+            foreach (DiscordWebhook hook in config.Webhooks.Values) {
+                hook.PingString = "";
+                foreach (string id in hook.PingRoleIds) {
+                    hook.PingString += $"<@&{id}> ";
+                }
+
+                foreach (string id in hook.PingUserIds) {
+                    hook.PingString += $"<@{id}> ";
                 }
             }
 
@@ -70,6 +77,8 @@ namespace RedditDiscordRSSBot {
                     }
                 }
             }
+
+            Debug.loaded();
         }
 
         private static void SaveConfig() {
@@ -212,7 +221,8 @@ namespace RedditDiscordRSSBot {
                     }
                 }
 
-                foreach (DiscordWebhook webhook in feed.DiscordWebhooks) {
+                foreach (String target in feed.WebhookTargets) {
+                    DiscordWebhook webhook = config.Webhooks[target];
                     using (var client = new DiscordWebhookClient(webhook.Endpoint)) {
                         client.SendMessageAsync(text: webhook.PingString.Length > 0 ? webhook.PingString : null, embeds: embeds).Wait();
                     }
@@ -242,6 +252,10 @@ namespace RedditDiscordRSSBot {
                 }
                 LastReadPurge = DateTime.Now;
             }
+        }
+
+        static void CatchExit(object sender, EventArgs e) {
+            Debug.exit();
         }
     }
 }
