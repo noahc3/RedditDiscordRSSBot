@@ -13,6 +13,7 @@ namespace RedditDiscordRSSBot {
         public string CommentsUrl;
         public bool HasImage;
         public string ImageUrl;
+        public bool LowQualityNotice = false;
 
         public Embed Embed;
     }

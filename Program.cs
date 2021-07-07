@@ -9,15 +9,20 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Net.Http;
 
 namespace RedditDiscordRSSBot {
     class Program {
+        private const string REDGIFS_API_METADATA = "https://api.redgifs.com/v1/gfycats/";
+
         public static Config config;
         private static Timer timer;
         private static Dictionary<string, bool> readPosts = new Dictionary<string, bool>();
         private static List<Tuple<double, List<string>>> timeClasses = new List<Tuple<double, List<string>>>();
         private static Comparer<Tuple<double, List<string>>> timeClassComparer = Comparer<Tuple<double, List<string>>>.Create((x, y) => x.Item1.CompareTo(y.Item1));
         private static DateTime LastReadPurge = DateTime.Parse("2000-1-01T00:00:00+00:00");
+
+        private static HttpClient httpClient = new HttpClient();
 
         static async Task Main(string[] args) {
             try {
@@ -185,8 +190,10 @@ namespace RedditDiscordRSSBot {
         }
 
         private static Post CreatePost(RssFeed feed, FeedItem k) {
+            bool lowQualityNotice = false;
             bool hasImage = feed.EmbedImages && k.HasElement("thumbnail");
             string directLink = (hasImage || feed.UseDirectLink) ? DirectLink(k) : "";
+            string imageUrl = hasImage ? EmbedUrl(ref lowQualityNotice, directLink) : "";
 
             Post post = new Post() {
                 Title = feed.DisplayTitles ? k.Title : "[Link]",
@@ -196,7 +203,8 @@ namespace RedditDiscordRSSBot {
                 Url = feed.UseDirectLink ? directLink : k.Link,
                 CommentsUrl = feed.IncludeCommentsLink ? k.Link : null,
                 HasImage = hasImage,
-                ImageUrl = hasImage ? directLink : ""
+                ImageUrl = hasImage ? imageUrl : "",
+                LowQualityNotice = lowQualityNotice
             };
 
             if (post.Url.StartsWith("/")) post.Url = "https://www.reddit.com" + post.Url;
@@ -208,7 +216,7 @@ namespace RedditDiscordRSSBot {
         private static Embed BuildDiscordEmbed(Post post) {
             var embed = new EmbedBuilder {
                 Title = post.Title,
-                Description = $"Posted in /r/{post.Subreddit} by {post.Author}" + (post.CommentsUrl != null ? $"\n[see comments]({post.CommentsUrl})" : ""),
+                Description = $"Posted in /r/{post.Subreddit} by {post.Author}" + (post.LowQualityNotice ? "\n(A higher quality video with audio may be available by visiting the link)" : "") + (post.CommentsUrl != null ? $"\n[see comments]({post.CommentsUrl})" : ""),
                 Timestamp = post.PublishDate,
                 Url = post.Url
             };
@@ -248,6 +256,26 @@ namespace RedditDiscordRSSBot {
             Match match = Regex.Match(item.Content, magic);
             if (match.Success) return match.Value;
             else return item.Link;
+        }
+
+        private static string EmbedUrl(ref bool lowQualityNotice, string directLink) {
+            string embedUrl = directLink;
+
+            if (embedUrl.Contains("redgifs.com")) {
+                string idMagic = "(?<=redgifs.com\\/watch\\/)[^?\\/\\s]*";
+                string gifMagic = "(?<=\\\"gifUrl\\\":\\\")[^,\"\\s}]*";
+                Match match = Regex.Match(embedUrl, idMagic);
+                if (match.Success) {
+                    HttpResponseMessage resp = httpClient.GetAsync(REDGIFS_API_METADATA + match.Value).Result;
+                    if (resp.IsSuccessStatusCode) {
+                        match = Regex.Match(resp.Content.ReadAsStringAsync().Result, gifMagic);
+                        embedUrl = match.Value.Replace("\\", "");
+                        lowQualityNotice = true;
+                    }
+                }
+            }
+
+            return embedUrl;
         }
 
 
