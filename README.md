@@ -41,7 +41,7 @@ The configuration file is stored next to the executable in `config.json`. A defa
     "IntervalSeconds": [0+],
     "OutputToConsole": [true/false],
     "ReadPostRetentionTimeHours": [1+],
-    "Webhooks": [...],
+    "Webhooks": {...},
     "Feeds": [...]
 }
 ```
@@ -102,7 +102,7 @@ The configuration file is stored next to the executable in `config.json`. A defa
   "PasteeeApiKey": "abcd1234fijk5678",
   "IntervalSeconds": 60,
   "OutputToConsole": true,
-  "DiscordWebhooks": {
+  "Webhooks": {
     "webhook-A": {
       "Endpoint": "https://discord.com/api/webhooks/123/abcd",
       "PingUserIds": [ "1234567890", "0987654321" ],
